@@ -1,76 +1,58 @@
 version: 2.1
+orbs:
+  ruby-orbs: sue445/ruby-orbs@1.3.10
 
-jobs:
-  install_dependency:
-    working_directory: ~/circleci-demo-ruby-rails
-    docker:
-      - image: circleci/ruby:2.4.1-node
-        environment:
-          RAILS_ENV: test
-    steps:
-      - checkout
-      - restore_cache:
-          key: v1-rails-demo-{{ checksum "Gemfile.lock" }}
-      - run: bundle install --path vendor/bundle
-      - save_cache:
-          key: v1-rails-demo-{{ checksum "Gemfile.lock" }}
-          paths:
-            - vendor/bundle
-
-  run_test:
+executors:
+  ruby-executor:
     working_directory: ~/circleci-demo-ruby-rails
     docker:
       - image: circleci/ruby:2.4.1-node
         environment:
           RAILS_ENV: test
       - image: circleci/postgres:9.4.12-alpine
+
+jobs:
+  install_dependency:
+    executor: ruby-executor
     steps:
       - checkout
-      - restore_cache:
-          key: v1-rails-demo-{{ checksum "Gemfile.lock" }}
-      - run: bundle install --path vendor/bundle
+      - ruby-orbs/bundle-install:
+          cache_key_prefix: v1-rails-demo
+
+  run_test:
+    executor: ruby-executor
+    steps:
+      - checkout
+      - ruby-orbs/bundle-install:
+          cache_key_prefix: v1-rails-demo
       - run:
           command: |
             bundle exec rake db:create
             bundle exec rake db:schema:load
-      
       - run: bundle exec rspec
 
   run_lint:
-    working_directory: ~/circleci-demo-ruby-rails
-    docker:
-      - image: circleci/ruby:2.4.1-node
-        environment:
-          RAILS_ENV: test
+    executor: ruby-executor
     steps:
       - checkout
-      - restore_cache:
-          key: v1-rails-demo-{{ checksum "Gemfile.lock" }}
-      - run: bundle install --path vendor/bundle
+      - ruby-orbs/bundle-install:
+          cache_key_prefix: v1-rails-demo
       - run: bundle exec rails_best_practices
+
   precompile:
-    working_directory: ~/circleci-demo-ruby-rails
-    docker:
-      - image: circleci/ruby:2.4.1-node
-        environment:
-          RAILS_ENV: test
+    executor: ruby-executor
     steps:
       - checkout
-      - restore_cache:
-          key: v1-rails-demo-{{ checksum "Gemfile.lock" }}
-      - run: bundle install --path vendor/bundle
-      - run: bundle exec rake assets:precompile RAILS_ENV=production 
+      - ruby-orbs/bundle-install:
+          cache_key_prefix: v1-rails-demo
+      - run: bundle exec rake assets:precompile RAILS_ENV=production
       - persist_to_workspace:
           root: public/
           paths:
             - assets
 
   deploy:
-    working_directory: ~/circleci-demo-ruby-rails
-    docker:
-      - image: circleci/ruby:2.4.1-node
-        environment:
-          RAILS_ENV: test
+    executor: ruby-executor
     steps:
       - attach_workspace:
           at: public
